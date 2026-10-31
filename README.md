@@ -11,6 +11,14 @@ The **Salvage specialist** starter plan includes one Tractor Beam. If the model 
 
 Sources: [Official Cosmos update](https://www.nomanssky.com/cosmos-update/), [community report on missing technology tile](https://www.reddit.com/r/oldmansky/comments/1wgdg22/tractor_beam_not_being_recognised_check_your/).
 
+## Family-first adjacency placement (October 31, 2026)
+
+The optimizer now **builds connected family clusters as its starting layout**, instead of randomly scattering all modules and trying to reunite them with single swaps. When multiple priority-family modules are fixed on supercharged positions, it first attempts to bridge compatible groups through available spaces. It then refines the result using stronger penalties for split groups and the existing goal-weighted adjacency bonuses.
+
+The selected goal's **eligible supercharged technology assignments remain protected**. Secondary families are now actively grouped even when their goal weight is zero. Single-slot utilities, unverified Corvette reactor relationships, and deliberately non-adjacent technology are not incorrectly awarded adjacency bonuses. Unreachable or far-separated SC positions and locked slots can still make some clusters impossible; no hidden in-game adjacency formula is claimed. The original PDF export, Backup JSON, modules, five interface themes, and Home Screen icon are unchanged.
+
+See `FAMILY-GROUPING-UPDATE.md` and `tests/grouping.test.cjs` for details and representative regression scenarios.
+
 ## Adjacency and color clarity improvement (October 30, 2026)
 
 Supercharged placements **still respect the chosen goal first**. During the adjacency phase, every verified compatible pair now receives a baseline benefit even if that family is not the selected priority. The optimizer also discourages split technology groups and runs a final legal grouping pass without evicting the goal's selected supercharged modules. In cases where far-apart purple slots force a split, it preserves those marked positions.

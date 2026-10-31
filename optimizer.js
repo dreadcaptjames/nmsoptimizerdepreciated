@@ -126,6 +126,124 @@
     const selected=ranked.slice(0,Math.max(0,Math.floor(Number(count)||0))).map(x=>x.index);
     return {ranked,selected,focusFamily:ranked.length?ranked[0].family:null};
   }
+  // A random scatter is a poor initial placement: the solver can become stuck
+  // with multiple disconnected islands even when a contiguous block was free.
+  // Lay out each adjacency-capable family as one connected region from the start.
+  // Marked supercharged positions and their chosen priority tiles are immutable.
+  function groupingFamily(tile, gear) {
+    if (!tile || tile.noAdjacency || gear.families[tile.family]?.adjacency === 'none') return null;
+    if (tile.family === 'story') return ['star','remembrance'].includes(tile.addon) ? 'story:pair' : null;
+    if (tile.family === 'underwater') return tile.role === 'upgrade' ? 'underwater:upgrades' : null;
+    return tile.family;
+  }
+  function groupedStart(map, tiles, gear, goal, cols, rows, blocked, rnd) {
+    const size=cols*rows;
+    const free=new Set();
+    for(let p=0;p<size;p++)if(!blocked.has(p)&&map[p]<0)free.add(p);
+    const groups=new Map(), loose=[];
+    for(let i=0;i<tiles.length;i++){
+      const key=groupingFamily(tiles[i],gear);
+      if(!key){if(map.indexOf(i)<0)loose.push(i);continue;}
+      if(!groups.has(key))groups.set(key,{key,all:[],pending:[],fixed:[],weight:Math.max(0,Number(goal.weights[tiles[i].family]??1))});
+      groups.get(key).all.push(i);
+    }
+    for(const group of groups.values()){
+      for(const id of group.all){
+        const pos=map.indexOf(id);
+        if(pos>=0)group.fixed.push(pos);
+        else group.pending.push(id);
+      }
+    }
+    const manhattan=(a,b)=>Math.abs(a%cols-b%cols)+Math.abs(Math.floor(a/cols)-Math.floor(b/cols));
+    const place=(position,id)=>{map[position]=id;free.delete(position);};
+    const regionSize=(start,needed)=>{
+      const visited=new Set([start]),stack=[start];
+      while(stack.length && visited.size<needed){
+        for(const q of getNeighbors(stack.pop(),cols,rows)){
+          if(free.has(q)&&!visited.has(q)){visited.add(q);stack.push(q);}
+        }
+      }
+      return visited.size;
+    };
+    const order=Array.from(groups.values()).sort((a,b)=>
+      (b.fixed.length>0)-(a.fixed.length>0) || b.fixed.length-a.fixed.length ||
+      b.weight-a.weight || b.all.length-a.all.length || a.key.localeCompare(b.key));
+    for(const group of order){
+      const owned=new Set(group.fixed);
+      // Lay down connective bridges before decorating the group footprint.
+      while(group.pending.length && owned.size>1){
+        // Only attempt to bridge disconnected components, not already linked tiles.
+        const seen=new Set(),components=[];
+        for(const start of owned){
+          if(seen.has(start))continue;
+          const component=new Set([start]),stack=[start];seen.add(start);
+          while(stack.length){
+            for(const q of getNeighbors(stack.pop(),cols,rows)){
+              if(owned.has(q)&&!seen.has(q)){seen.add(q);component.add(q);stack.push(q);}
+            }
+          }
+          components.push(component);
+        }
+        if(components.length<=1)break;
+        let candidate=null;
+        // The shortest path must connect DIFFERENT components. Paths wholly
+        // inside one component would consume modules with no grouping benefit.
+        for(const component of components){
+          const queue=[...component],seen=new Set(component),prev=new Map();
+          for(let head=0;head<queue.length;head++){
+            const q=queue[head];
+            for(const n of getNeighbors(q,cols,rows)){
+              if(seen.has(n)||(!free.has(n)&&!owned.has(n)))continue;
+              seen.add(n);prev.set(n,q);
+              if(owned.has(n) && !component.has(n)){
+                const cells=[];let v=n;
+                while(!component.has(v)){
+                  if(free.has(v))cells.push(v);
+                  v=prev.get(v);
+                }
+                if(cells.length&&cells.length<=group.pending.length&&(!candidate||cells.length<candidate.length))candidate=cells;
+              }else queue.push(n);
+            }
+          }
+        }
+        if(!candidate)break;
+        for(const cell of candidate){place(cell,group.pending.shift());owned.add(cell);}
+      }
+      // Grow a connected polyomino. Prefer placing adjacent to multiple own
+      // tiles, then against walls/other modules rather than creating holes.
+      while(group.pending.length && free.size){
+        const frontier=[];
+        if(owned.size){
+          const known=new Set();
+          for(const p of owned)for(const n of getNeighbors(p,cols,rows)){
+            if(free.has(n)&&!known.has(n)){known.add(n);frontier.push(n);}
+          }
+        }
+        const candidates=frontier.length?frontier:Array.from(free);
+        let best=-Infinity,chosen=-1;
+        for(const p of candidates){
+          const neighbors=getNeighbors(p,cols,rows);
+          const own=neighbors.filter(n=>owned.has(n)).length;
+          const filled=neighbors.filter(n=>!free.has(n)).length;
+          const boundary=4-neighbors.length;
+          const far=owned.size?Math.min(...Array.from(owned,x=>manhattan(x,p))):0;
+          // Leave sufficient contiguous cells for modules still to place.
+          const capacity=frontier.length||group.pending.length<=1?group.pending.length:regionSize(p,group.pending.length);
+          const viable=capacity>=Math.min(group.pending.length,free.size)?0:-12;
+          const score=own*15+filled*1.6+boundary*2-far*1.4+viable+rnd()*.9;
+          if(score>best){best=score;chosen=p;}
+        }
+        if(chosen<0)break;
+        place(chosen,group.pending.shift());owned.add(chosen);
+      }
+    }
+    // Standalone utilities, unverified Corvette reactors and no-adjacency
+    // upgrades have no modeled reason to be placed inside a family cluster.
+    const leftovers=loose.concat(Array.from(groups.values()).flatMap(g=>g.pending));
+    let k=0;
+    for(const p of free)if(k<leftovers.length)map[p]=leftovers[k++];
+    return map;
+  }
   function scoreMap(map, tiles, gear, goal, cols, rows, supercharged) {
     let score = 0, connections = 0, usedSC = 0, effectiveSC = 0;
     let scScore = 0, adjacencyScore = 0, compactnessPenalty = 0, fragmentedGroups = 0;
@@ -201,7 +319,7 @@
         }
       }
       if(components>1){fragmentedGroups+=components-1;
-        compactnessPenalty+=(components-1)*(5 + 1.1*weight);}
+        compactnessPenalty+=(components-1)*(62 + 4*weight);}
     });
     score = scScore + adjacencyScore - compactnessPenalty;
     return {score,connections,usedSC,effectiveSC,scScore,adjacencyScore,
@@ -225,12 +343,11 @@
     const scPositions=new Set(sc);
     let bestMap = null, bestStats = null;
     const seed = stableSeed(JSON.stringify([profile.goal,profile.vehicle,profile.enabled,profile.addons,profile.depth,profile.cols,profile.rows,sc,profile.blocked,(profile.fixedTiles||[]).map(t=>t.id)]));
-    const loops = Math.min(5600,Math.max(2200,available.length*90));
-    for (let run=0;run<7;run++) {
+    const loops = Math.min(4600,Math.max(1800,available.length*75));
+    for (let run=0;run<6;run++) {
       const rnd = randomGenerator(seed + run*10007);
       const map = Array(size).fill(-1);
-      const shuffled = available.slice();
-      for(let i=shuffled.length-1;i>0;i--){const j=Math.floor(rnd()*(i+1));[shuffled[i],shuffled[j]]=[shuffled[j],shuffled[i]];}
+
       // Fill as many marked SC positions as logically beneficial, using goal
       // order first (e.g. all viable primary-weapon tiles), THEN lower ranks.
       // Runs vary the slot assignments to find a stronger adjacency pattern.
@@ -238,14 +355,12 @@
         getNeighbors(b,cols,rows).filter(p=>!blocked.has(p)).length-
         getNeighbors(a,cols,rows).filter(p=>!blocked.has(p)).length);
       if(run%2===1)availableSC.reverse();
-      const assigned=new Set(),filled=new Set();
       for(let j=0;j<scChoice.selected.length;j++){
         map[availableSC[j]]=scChoice.selected[j];
-        assigned.add(scChoice.selected[j]);filled.add(availableSC[j]);
       }
-      const unfilled=shuffled.filter(p=>!filled.has(p));
-      const remaining=tiles.map((_,i)=>i).filter(i=>!assigned.has(i));
-      for(let i=0;i<remaining.length;i++)map[unfilled[i]]=remaining[i];
+      // Build contiguous technology islands first, rather than starting every
+      // run with scattered tiles and hoping local swaps eventually repair them.
+      groupedStart(map,tiles,gear,goal,cols,rows,blocked,rnd);
       let now = scoreMap(map,tiles,gear,goal,cols,rows,sc);
       let top = now;
       let topMap = map.slice();
