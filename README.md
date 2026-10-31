@@ -1,137 +1,39 @@
 # ATLAS MAX
 
-**Game reference: FORSAKEN 7.10 (October 28, 2026), Corvette priority correction October 29 and missing-module audit October 30, 2026.** The performance-focused Corvette catalog includes official named cockpit variants, three newly identified generators, Dematerialisation Ray and Venom Spitter, new propulsion and landing hardware, and named Legion/Legionnaire/Gunner habitation parts. Decorative hull/interior pieces are no longer shown in the active catalog. An optional Forsaken design family and courier focus are available. The Multi-Tool workbench includes guidance for the new Larva Cannon chassis. The new warp mechanic and weapon wheel do not create new technology adjacency bonuses, so the existing optimizer adjacency rules remain unchanged. For provenance and open limitations, see `FORSAKEN-7.10-UPDATE.md`.
+**A No Man’s Sky technology layout optimizer and Corvette planning companion.**
 
+ATLAS MAX helps you organize installed technology, make better use of supercharged slots, and keep compatible upgrades grouped together. Choose what you want to optimize for, tell the app which equipment and technology you have, and generate a layout to recreate in-game.
 
-## Corvette Tractor Beam inventory correction (October 31, 2026)
+## What you can do
 
-The **Cosmos 7.0 Tractor Beam** is now visible under **Utility & salvage systems** and the **Utilities & salvage** catalog filter. This is a functional cargo-collection utility, not decorative hull. Adding it creates a **mandatory construction-linked technology tile** (family `cv-tractor`, code `TRB`) and takes an available slot in the Corvette's technology grid. Every physical beam is modeled as a technology tile for slot-budget planning; confirm multiple-module behavior in your actual save. Its color is distinct and it has **no invented adjacency or supercharged stat bonus**.
+- **Optimize six equipment types:** Exosuit, Multi-Tool, Starship, Freighter, Exocraft, and Corvette.
+- **Choose your goal:** Prioritize the systems that matter to your build, such as exploration, travel, combat, or survival.
+- **Plan supercharged slots:** Mark the positions from your actual in-game inventory so the optimizer can prioritize the best-fitting technology there.
+- **Improve adjacency:** Group compatible upgrades together for supported adjacency bonuses. The optimizer also tries to keep matching components physically grouped, even when no stat bonus is confirmed.
+- **Customize your inventory:** Select installed technologies, adjust the grid, and mark unavailable or blocked slots.
+- **Plan a Corvette:** Choose functional construction parts—including engines, reactors, weapons, habitation, landing systems, and utilities—and see the linked technology-slot requirements. Use Corvette-specific goals, starter plans, and weapon priorities.
+- **Export a PDF:** Save a readable, color-coded report of your current layout, including its technology index and, for Corvettes, the construction manifest.
+- **Save an editable backup:** Export your profiles as JSON and import them later to continue planning.
+- **Personalize the interface:** Switch between Atlas, Void Mother, Vy’keen, Gek, and Korvax color themes.
 
-The **Salvage specialist** starter plan includes one Tractor Beam. If the model cannot fit a linked tile, a capacity warning identifies the missing part; a full in-game technology inventory can also stop a Tractor Beam from registering properly for salvage contracts. The PDF manifest, layout PDF, and JSON backups retain the Tractor Beam and its grid position. All existing build and weapon-priority calculations remain otherwise unchanged.
+## How to use it
 
-Sources: [Official Cosmos update](https://www.nomanssky.com/cosmos-update/), [community report on missing technology tile](https://www.reddit.com/r/oldmansky/comments/1wgdg22/tractor_beam_not_being_recognised_check_your/).
+1. Open ATLAS MAX in your browser and select an equipment type.
+2. Choose the technology you have installed and the goal for your build.
+3. Match the available grid space to your in-game inventory, then mark your **supercharged slots**.
+4. Select **Optimize** (or **Optimize Corvette tech**) to generate an arrangement.
+5. Review the result, make adjustments if needed, and export a PDF for reference while arranging your inventory in-game.
 
-## Corvette hab/reactor grouping correction (October 31, 2026)
+**Your layout starts fresh when the page loads.** No supercharged slots are selected automatically. Use **Backup JSON** if you want to save an editable build before refreshing or closing the page; use **Import** to restore it. A PDF is a reference report, not an editable backup.
 
-The optimizer now places matching construction-only technology tiles together even when their in-game adjacency bonus has **not** been verified. Previously, `noAdjacency:true` caused multiple Legion-Class Habs, Chelone-Class Generators, and other built modules to be treated as unrelated loose tiles, leading to scattered inventory placements. The fix separates **spatial organization** from **verified adjacency**: built modules with the same physical family now form contiguous grid clusters when possible, but their proximity never increases the modeled link count or stat bonus. Existing supercharged assignments remain protected. A cohesion guard prevents stochastic refinement from undoing connected families.
+## Where it runs
 
-The uploaded October 31 Corvette PDF is now a dedicated regression fixture: the same 10×6 layout with 50 modules and four scattered Long Range SC positions creates three adjacent Habs, two adjacent Chelone Generators, and keeps all four Hyperdrive priority modules on SC. See `tests/pdf-corvette-regression.test.cjs` and `CORVETTE-COHESION-FIX.md`. Re-run **Optimize Corvette tech** after deploying; previous PDF reports and saved arrangements are not rewritten automatically.
+ATLAS MAX is a self-contained browser-based web app. It can be hosted on **GitHub Pages, Netlify, or another static web host**. No server, account, database, or build step is required. For hosting instructions, see [DEPLOYMENT.md](DEPLOYMENT.md).
 
-## Family-first adjacency placement (October 31, 2026)
+For craftable and refinable items, visit the companion [NMS Crafting & Refining Guide](https://dreadcaptjames.github.io/nmscraftingrefining/), also linked at the bottom of the app.
 
-The optimizer now **builds connected family clusters as its starting layout**, instead of randomly scattering all modules and trying to reunite them with single swaps. When multiple priority-family modules are fixed on supercharged positions, it first attempts to bridge compatible groups through available spaces. It then refines the result using stronger penalties for split groups and the existing goal-weighted adjacency bonuses.
+## Important notes
 
-The selected goal's **eligible supercharged technology assignments remain protected**. Secondary families are now actively grouped even when their goal weight is zero. Single-slot utilities, unverified Corvette reactor relationships, and deliberately non-adjacent technology are not incorrectly awarded adjacency bonuses. Unreachable or far-separated SC positions and locked slots can still make some clusters impossible; no hidden in-game adjacency formula is claimed. The original PDF export, Backup JSON, modules, five interface themes, and Home Screen icon are unchanged.
+ATLAS MAX is a **planning tool**, not a save editor or an exact in-game stat calculator. It does not read your game inventory or automatically know your module rolls. Its optimization is based on modeled priorities and supported adjacency relationships; verify the final results and actual stats in-game. Corvette construction mappings are planning estimates and do not replace checking the ship's inventory.
 
-See `FAMILY-GROUPING-UPDATE.md` and `tests/grouping.test.cjs` for details and representative regression scenarios.
-
-## Adjacency and color clarity improvement (October 30, 2026)
-
-Supercharged placements **still respect the chosen goal first**. During the adjacency phase, every verified compatible pair now receives a baseline benefit even if that family is not the selected priority. The optimizer also discourages split technology groups and runs a final legal grouping pass without evicting the goal's selected supercharged modules. In cases where far-apart purple slots force a split, it preserves those marked positions.
-
-Technology icons, grid cells and inspector cards now use an expanded **family-specific color palette** (82 stable identities across the current equipment catalogs); tile codes such as `HYP · U1` remain visible so color is not the only distinguishing cue. The five interface themes and purple supercharged indicators remain separate. See `ADJACENCY-AND-TECH-COLOR-UPDATE.md`.
-
-**A No Man’s Sky equipment and technology optimization companion**
-
-ATLAS MAX is an unofficial, browser-based planning tool for players who want to make better use of their equipment technology slots. It helps you explore upgrade combinations, organize technology around adjacency bonuses, decide what belongs in supercharged slots, and compare possible layouts before recreating them in the game.
-
-It combines a No Man’s Sky-inspired inventory workbench with a streamlined dashboard. Everything is designed for manual, player-controlled experimentation: **changing a setting or selecting a blueprint never generates a new layout on its own.**
-
-## Corvette supercharged-slot priorities (October 29 correction)
-
-The Corvette Workshop now synchronizes its construction **Build focus** with the technology optimizer goal whenever Build focus changes: Long-range traveller → Long-range explorer; Combat Corvette → Space dogfighter; other construction goals use a travel or balanced technology preset. The technology goal can still be changed independently afterward.
-
-Long Range prioritizes hyperdrive and propulsion (including the verified Zenith / Medusa system relationships) and gives weapons **zero modeled supercharged priority**. Combat prioritizes the player's chosen weapon. Balanced gives more weight to mobility/defense than weapons. No fixed in-game percentage is implied by the scoring. An already optimized layout is marked **stale** when its goal changes; click **Optimize Corvette tech** again to apply the new priority. The main Starship optimizer is unchanged.
-
-## What you can plan
-
-| Equipment | What ATLAS MAX helps you explore |
-| --- | --- |
-| **Exosuit** | Movement, jetpack systems, life support, shields, environmental protection, underwater equipment, and utilities. |
-| **Multi-tool** | Mining, scanning, weapons, defensive tools, and specialist upgrades. |
-| **Starship** | Flight systems, launch efficiency, weapons, defenses, hyperdrives, and utility technology, including supported Sentinel Interceptor systems. |
-| **Freighter** | Warp technology, expedition-related upgrades, and onboard utilities. |
-| **Exocraft** | Separate layouts for the Roamer, Nomad, Pilgrim, Colossus, Minotaur, and Nautilon, with vehicle-appropriate technology. |
-| **Corvette** | A modular construction workshop linked directly to a technology grid, with supercharged-slot and adjacency-aware planning. |
-
-The technology catalogs include named crafted upgrades and procedural module families, rather than treating every system as a generic upgrade.
-
-## What the app does
-
-### Build a layout that matches your equipment
-
-- Set up an editable technology-slot grid, including locked slots and the supercharged positions found in your own inventory.
-- Choose technology families and individual blueprints from searchable, collapsible lists.
-- Rearrange an existing layout using drag-and-drop on desktop or tap/click-to-swap controls.
-- Review individual technologies in the inspector alongside the overall layout.
-
-### Optimize for your priorities
-
-- Choose a goal suited to the equipment, such as movement, combat, exploration, or travel.
-- Generate a suggested arrangement **only when you explicitly choose Optimize layout**.
-- **Fill supercharged slots according to your chosen goal first:** prioritize as many eligible modules from the highest-ranked family as are useful and available, then continue to the next family if purple slots remain.
-- Arrange the remaining technology around those supercharged assignments to improve modeled orthogonal adjacency. Technology belonging to the same functional category does **not** automatically mean it shares an adjacency bonus.
-- Inspect which technologies occupy supercharged slots and view their *relative planning contribution*.
-- Distinguish core technology, crafted blueprints, and procedural upgrades; enforce supported procedural module limits and selected incompatibilities.
-
-
-### Technology relationships and adjacency
-
-ATLAS MAX distinguishes the **system a technology belongs to** from the **modules it actually links with**. For example, Emergency Warp Unit is a Hyperdrive adjacency helper, while Aqua Jets provides water landing without modeled Launch Thruster adjacency. The underwater Aeration Membrane is not treated as a direct bonus source for rechargeable Underwater Protection Modules; those underwater modules connect to each other. General environmental protection has some verified cross-family links that the planner models.
-
-The optimizer and highlighted slot borders use the same relationship rules. It avoids inventing bonuses for Corvette reactor relationships, independent ship utilities, and known functional-only components. A module can help neighboring upgrades without itself benefiting from a supercharged slot. These rules are a curated, conservative model; the game does not expose its complete live internal calculations to the app.
-
-### Plan Corvettes in two ways
-
-**Corvette Workshop** now offers **77 performance, utility, construction-essential and disputed-main-engine entries**. Cosmetic wings, hull skins and interior furnishings are hidden from the catalog; older saved manifests can still be imported, with a one-click option to remove visual-only entries. The four existing reactors plus three FORSAKEN generators are independent technology families; Dematerialisation Ray and Venom Spitter each have their own weapon priority, and functional new propulsion, landing and habitation modules are supported. Eldritch, Gorgon, Plated and Lockjaw Thrusters are shown as contested main-engine candidates because game-item databases and community visual-parts references disagree on their stat contribution. Real stat rolls and construction order must be checked in-game. See `FORSAKEN-CATALOG-CORRECTION.md`.
-
-**Corvette Technology Optimizer** now mirrors functional construction modules in the technology grid as soon as they are added to the Corvette manifest. Reactor types, weapon arrays, engines, shields, landing systems, cockpit, and relevant habitation modules can produce individual construction-linked technology tiles. Additional physical copies beyond each supported tech contribution are tracked as non-tech copies; purely decorative and interior parts do not create technology tiles. These construction tiles are reserved in the grid before optional rolled starship upgrades.
-
-Each linked construction tile records the physical part that created it and the related ship system. For example, Zenith reactors are related to hyperdrive range, Medusa to maneuverability, Azimuth to recharge, and Ceto to defensive systems. Such functional relationships **do not by themselves prove an adjacency bonus**, so the planner visibly distinguishes modeled adjacency connections from relationships that have not been established as adjacency effects. Construction order, Corvette class, available technology space, and current game behavior may affect the actual inventory.
-
-**Corvette weapon selection:** Corvette technology no longer inherits the regular starship preset’s Infra-Knife selection. Adding a Corvette weapon module or enabling a shared weapon marks that system as the primary weapon; **Primary weapon priority** in the Corvette technology panel allows an explicit override for multi-weapon builds. Changing the technology goal preserves your selected weapon families. Starter plans use the preferred weapon instead of automatically adding Infra-Knife to combat builds. A blank Corvette starts without a preselected weapon; the starter generator uses Photon Cannon Array as its fallback only when no weapon has been chosen. Older imported builds retain their explicitly stored technology selections, including Infra-Knife if present.
-
-**Adding or removing a Corvette part immediately updates its modeled technology tile(s)** while preserving existing manual slot coordinates when possible. It never silently runs full optimization: press **Optimize Corvette tech** to rearrange the entire matrix based on your supercharged positions, chosen goal, and same-family adjacency. The Corvette planner still includes manually selected shared starship technology and crafted upgrades, separately from construction modules.
-
-### Keep and revisit your builds
-
-- Work with independent equipment layouts and individual Exocraft models during the current visit. Every new page load starts from the default presets.
-- **Export PDF** downloads a readable report of the active equipment build (technology grid, supercharged positions, full module index and, for Corvettes, the construction manifest). **Backup JSON** separately saves all six profiles in an editable format; use **Import** to restore it.
-- Use the responsive workbench on desktop and smaller screens.
-- Browse without an account or a connection to the game; the interface and its icons are self-contained.
-
-## What ATLAS MAX does *not* do
-
-**ATLAS MAX is a planning aid, not an in-game stat simulator or save editor.** Its optimization score is a relative heuristic for comparing possible placements. It is **not** an exact calculation of damage per second, hyperdrive range, shields, maneuverability, jetpack performance, or the random rolls on installed upgrades. Players should compare recommendations against their actual module stats in-game.
-
-In particular:
-
-- It **does not** read, edit, or sync No Man’s Sky save files or inventories.
-- It **does not** automatically know your unlocked slots, supercharged positions, owned blueprints, installed modules, or upgrade rolls; you supply those details.
-- It **does not** guarantee the strongest possible numerical build for every real-game situation.
-- It **does not** automatically regenerate a layout when you change checkboxes, equipment, goals, or slot positions.
-- The Corvette schematic **does not** simulate full 3D placement, snapping, collision, ship dimensions, or workshop validation. Its essential-parts checklist is a planning check, not proof that a ship can be built exactly as drawn.
-- Corvette construction-to-technology mappings are **planning approximations**, not a direct readout of your in-game inventory. Some parts compete for tech slots, and installation order, class caps and game updates/bugs can change what is shown. Check the Corvette's actual technology inventory after construction.
-- A Corvette reactor's effect on flight statistics **does not imply adjacency synergy** with the corresponding starship system. Unverified relationships are labeled as functional links and are not scored as adjacency bonuses.
-- The expanded Corvette construction catalog is still **not guaranteed exhaustive**, especially for the launch-day Forsaken biomechanical items whose individual names have not been published. The additional historical visual and structural names come from community part catalogs; the app never assumes their unverified stats, snap rules, or technology effects.
-- It **does not** provide a dedicated Living Ship organic-technology optimizer.
-- Some upgrades are mission-, expedition-, ship-, or progression-specific. Catalog availability does not mean an item is currently obtainable in every save.
-
-## Player control and data
-
-**ATLAS MAX always starts fresh.** Opening or refreshing the page restores the default settings for all six equipment categories, with **no supercharged slots preselected**; it does not automatically reload a previous build. Mark the purple-slot positions you actually have before optimizing. While the page is open, switching equipment categories retains your changes within that visit. To keep an editable build between visits, use **Backup JSON** to save all equipment profiles, then **Import** to restore that file later. **Export PDF** downloads the currently selected equipment as a view-only reference and is not an importable save. If you close or refresh the page before making a JSON backup, you should expect to start over. Nothing is uploaded to an ATLAS MAX account or game service.
-
-The app's illustrated icons are original, game-inspired interface artwork, not official No Man’s Sky inventory icons.
-
-## About this project
-
-ATLAS MAX is an **unofficial fan-made companion** and is not affiliated with, sponsored by, or endorsed by Hello Games. No Man’s Sky names are used to identify the in-game systems being discussed.
-
-For official game changes and patch information, see the [No Man’s Sky release log](https://www.nomanssky.com/release-log/).
-
-
-## PDF reports (October 30, 2026)
-
-The **Export PDF** action now downloads a real, multi-page PDF for the **currently selected equipment category**. The report is generated entirely in the browser with a local, dependency-free PDF generator (`pdf-export.js`) and includes a color-coded technology matrix with numbered slots and purple SC markers, an index of installed technologies with row/column coordinates, class/focus metadata, and planning metrics. Corvette reports also include a grouped manifest with module quantities and assigned zones. Reports show a warning if the current layout needs re-optimization, or note if no layout has been generated yet.
-
-PDFs are designed for printing, sharing, and referring to while arranging technology in-game. **PDFs are not editable backups.** The separate **Backup JSON** button retains the existing all-equipment JSON format so users can continue to use the **Import** button. No account, backend, CDN, third-party script, or network connection is required to generate reports. See `PDF-EXPORT.md` for testing and known limitations.
+This is an **unofficial fan-made No Man’s Sky companion** and is not affiliated with or endorsed by Hello Games.
