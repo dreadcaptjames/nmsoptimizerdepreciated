@@ -85,7 +85,7 @@ const parts=[
   ['osprey-wing','Osprey Wing Module','Wings & structure','wing','ship','mid','exterior','Wing / flight-stabilizer component.'],
   ['arcadia-wing','Arcadia Wing Module','Wings & structure','wing','ship','mid','exterior','Wing / flight-stabilizer component.'],
   ['ambassador-wing','Ambassador Wing Module','Wings & structure','wing','ship','mid','exterior','Wing / flight-stabilizer component.'],
-  ['tractor','Tractor Beam','External utilities','utility','grav','aft','exterior','Cosmos-era utility for retrieving physical cargo from space salvage.'],
+  ['tractor','Tractor Beam','Utility & salvage systems','utility','grav','mid','exterior','Cosmos 7.0 cargo-salvage utility. It requires Corvette technology inventory space to register. ATLAS MAX models one occupied tech slot per installed beam; check multiple units against your actual inventory. No verified supercharged or adjacency bonus.'],
   ['mission-radar','Mission Radar','Interior amenities','utility','scanner','mid','interior','Onboard mission interface. Constructed within the ship.'],
   ['refiner-unit','Refiner Unit','Interior amenities','utility','refiner','mid','interior','Onboard resource refining.'],
   ['nutrition-unit','Nutrition Unit','Interior amenities','utility','food','mid','interior','Onboard food processing.'],
@@ -212,12 +212,14 @@ const parts=[
   ['catalog-internal-door','Internal Door','Interior connections','utility','freighter','mid','interior','Verified catalog name. Interior item; no external technology or adjacency bonus asserted.'],
   ['catalog-internal-stairway','Internal Stairway','Interior connections','utility','freighter','mid','interior','Verified catalog name. Interior item; no external technology or adjacency bonus asserted.'],
   ['catalog-holo-tube','Holo-Tube','Interior connections','utility','freighter','mid','interior','Verified catalog name. Interior item; no external technology or adjacency bonus asserted.'],
-].map(([id,name,section,group,icon,zone,kind,description])=>({id,name,section,group,icon,zone,kind,description,era:id.startsWith('forsaken-')?'Forsaken 7.10':'Voyagers / prior',provisional:id.includes('placeholder')||id==='forsaken-legion-interior',tab:id.startsWith('forsaken-')?'forsaken':kind==='interior'?'interior':group==='weapon'||group==='reactor'||group==='shield'||group==='cockpit'||group==='hab'||group==='access'||group==='landing'||group==='engine'?'systems':section.includes('Wings')||section.includes('stabilisers')?'wings':section.includes('Hull')||section.includes('plating')?'hull':'extras',limit:group==='cockpit'?1:group==='reactor'?3:(kind==='interior'?30:12)}));
+].map(([id,name,section,group,icon,zone,kind,description])=>({id,name,section,group,icon,zone,kind,description,era:id.startsWith('forsaken-')?'Forsaken 7.10':id==='tractor'?'Cosmos 7.0':'Voyagers / prior',provisional:id.includes('placeholder')||id==='forsaken-legion-interior',tab:id.startsWith('forsaken-')?'forsaken':id==='tractor'?'utilities':kind==='interior'?'interior':group==='weapon'||group==='reactor'||group==='shield'||group==='cockpit'||group==='hab'||group==='access'||group==='landing'||group==='engine'?'systems':section.includes('Wings')||section.includes('stabilisers')?'wings':section.includes('Hull')||section.includes('plating')?'hull':'extras',limit:group==='cockpit'?1:group==='reactor'?3:(kind==='interior'?30:12)}));
 // The main planner excludes confirmed visual-only hull pieces, wings and interior furnishings.
 // Disputed Forsaken Thrusters remain visible as item-data Main Engine candidates.
+// Tractor Beam is an explicit exception to the visual-only utility filter:
+// it registers technology and must consume available inventory space.
 // Historic part IDs remain in `parts` solely to preserve import/export compatibility.
 const performanceGroups=new Set(['cockpit','hab','structure','access','landing','reactor','engine','weapon','shield']);
-const performanceParts=parts.filter(part=>performanceGroups.has(part.group) && part.kind!=='interior');
+const performanceParts=parts.filter(part=>(performanceGroups.has(part.group)||part.id==='tractor') && part.kind!=='interior');
 const performanceIds=new Set(performanceParts.map(part=>part.id));
 const byId=Object.fromEntries(parts.map(p=>[p.id,p]));
 const required=[['cockpit','Cockpit'],['hab','Habitation module'],['access','Access / landing bay'],['landing','Landing gear'],['reactor','Reactor'],['engine','Main engine / thruster'],['weapon','Weapon system']];
@@ -247,7 +249,7 @@ function generate(goalId,style,weaponPartId='photon-array'){const goal=goals[goa
  if(goal==='combat'){counts['ion-barrier']=1;counts['deflector']=1;}
  else if(goal==='range'){counts['medusa-reactor']=1;counts['ambassador-sublight']=1;counts['deflector']=1;}
  else if(goal==='crew'){counts[hab]=2;counts['medusa-reactor']=1;counts['deflector']=1;}
- else if(goal==='salvage'){counts['deflector']=1;counts['ambassador-sublight']=1;}
+ else if(goal==='salvage'){counts['deflector']=1;counts['ambassador-sublight']=1;counts['tractor']=1;}
  else if(goal==='courier'){counts['deflector']=1;counts['ambassador-sublight']=1;}
  else{counts['deflector']=1;counts['ambassador-sublight']=1;}
  return counts;
@@ -256,6 +258,7 @@ function generate(goalId,style,weaponPartId='photon-array'){const goal=goals[goa
 // Relationship = functional stat/system supported by the part; it is not proof
 // of an in-game adjacency bonus. Reactors deliberately stay separate families.
 const systemRelations={
+ 'tractor':{family:'cv-tractor',label:'Tractor Beam · cargo salvage utility',note:'Consumes a Corvette technology inventory slot and enables physical salvage collection. No confirmed adjacency or supercharged stat benefit. If it fails to register in-game, check whether a technology slot is open.'},
  'zenith-reactor':{family:'cv-zenith',link:'hyperdrive',label:'Hyperdrive range',note:'Zenith contributes to hyperdrive performance. Vanilla reactor-to-hyperdrive adjacency is not confirmed.'},
  'medusa-reactor':{family:'cv-medusa',link:'pulse',label:'Flight maneuverability',note:'Medusa contributes to maneuverability. Do not assume a Pulse Drive adjacency bonus.'},
  'azimuth-reactor':{family:'cv-azimuth',link:'launch',label:'Launch / system recharge',note:'Azimuth is associated with recharge and flight utility. Adjacency is unverified.'},
@@ -275,6 +278,7 @@ const systemRelations={
 const weaponFamilyByPart=Object.fromEntries(Object.entries(systemRelations).filter(([id,relation])=>byId[id]?.group==='weapon').map(([id,relation])=>[id,relation.family]));
 const weaponPartByFamily=Object.fromEntries(Object.entries(weaponFamilyByPart).map(([id,family])=>[family,id]));
 const specialFamilies={
+ 'cv-tractor':{name:'Tractor Beam',short:'TRB',icon:'grav',color:'cyan',sc:'none',adjacency:'none',maxUpgrades:0,why:'Cosmos 7.0 Corvette cargo-salvage utility. It occupies a technology slot but has no verified supercharged or adjacency stat bonus.',next:'Keep a free tech slot for this utility; confirm it registers in-game for salvage missions.'},
  'cv-zenith':{name:'Zenith Reactor',short:'ZEN',icon:'warpFreighter',color:'violet',sc:'construction',adjacency:'none',maxUpgrades:0,why:'Corvette-built reactor associated with hyperdrive range; adjacency not assumed.',next:'Check the installed module in-game.'},
  'cv-medusa':{name:'Medusa Reactor',short:'MED',icon:'engine',color:'mint',sc:'construction',adjacency:'none',maxUpgrades:0,why:'Corvette-built reactor associated with maneuverability; adjacency not assumed.',next:'Check the installed module in-game.'},
  'cv-azimuth':{name:'Azimuth Reactor',short:'AZI',icon:'engine',color:'amber',sc:'construction',adjacency:'none',maxUpgrades:0,why:'Corvette-built reactor associated with system recharge; adjacency not assumed.',next:'Check the installed module in-game.'},
@@ -299,7 +303,9 @@ function technologyManifest(counts){
   const pool=part.group==='structure'?'hab':part.group;
   const shared=Object.hasOwn(groupCaps,pool);
   const key=shared?pool:part.id;
-  const max=shared?groupCaps[pool]:3;
+  // Tractor Beams consume technology slots, even though they are not stat upgrades.
+  // Allow one represented tile per physical module; the real game inventory is authoritative.
+  const max=part.id==='tractor'?part.limit:(shared?groupCaps[pool]:3);
   const remaining=Math.max(0,max-(usage[key]||0));
   const represented=Math.min(count,remaining);
   usage[key]=(usage[key]||0)+represented;
@@ -308,7 +314,7 @@ function technologyManifest(counts){
    id:`cvpart:${part.id}:${n}`,family:relation.family,role:'construction',sequence:n,
    partId:part.id,linkFamily:relation.link||null,relationLabel:relation.label,
    relationNote:relation.note||'',label:`${part.name}${count>1?' · '+n:''}`,icon:part.icon,
-   noAdjacency:!relation.adjacent,construction:true
+   noAdjacency:!relation.adjacent,noSC:part.id==='tractor',construction:true
   });
  }
  return {tiles,statuses};
