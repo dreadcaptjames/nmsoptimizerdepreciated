@@ -131,10 +131,61 @@
   // Lay out each adjacency-capable family as one connected region from the start.
   // Marked supercharged positions and their chosen priority tiles are immutable.
   function groupingFamily(tile, gear) {
-    if (!tile || tile.noAdjacency || gear.families[tile.family]?.adjacency === 'none') return null;
+    if (!tile) return null;
+    // These physical Corvette modules still belong together even when their
+    // inventory tiles have NO VERIFIED IN-GAME ADJACENCY BONUS. This is a
+    // visual placement preference only, never an invented stat/link bonus.
+    // In particular, Legion-Class Habs and Chelone-Class Generators must not
+    // become 'loose' tiles simply because no adjacency formula is known.
+    if (tile.role === 'construction' && tile.noAdjacency) {
+      // Distinct reactor models have independent stat families, but they are
+      // still the same physical construction category and should be packed
+      // together where possible. This grouping does NOT imply a bonus link.
+      if (tile.partId && /-reactor$/.test(tile.partId)) return 'physical:reactors';
+      return 'physical:' + tile.family;
+    }
+    if (tile.noAdjacency || gear.families[tile.family]?.adjacency === 'none') return null;
     if (tile.family === 'story') return ['star','remembrance'].includes(tile.addon) ? 'story:pair' : null;
     if (tile.family === 'underwater') return tile.role === 'upgrade' ? 'underwater:upgrades' : null;
     return tile.family;
+  }
+  // Geometric clustering is deliberately distinct from a gameplay adjacency
+  // relationship. Never use this predicate to calculate stat/adjacency links.
+  function canGroupTiles(a, b, gear) {
+    if (!a || !b) return false;
+    const key=groupingFamily(a,gear);
+    if (!key || key!==groupingFamily(b,gear)) return false;
+    return key.startsWith('physical:') || areAdjacent(a,b,gear);
+  }
+  function groupShape(map, tiles, gear, cols, rows) {
+    const groups=new Map();
+    for(let pos=0;pos<map.length;pos++) {
+      const tile=tiles[map[pos]],key=groupingFamily(tile,gear);
+      if(!key)continue;
+      if(!groups.has(key))groups.set(key,[]);
+      groups.get(key).push(pos);
+    }
+    const result=[];
+    for(const [key,positions] of groups) {
+      if(positions.length<2)continue;
+      const todo=new Set(positions),components=[];
+      while(todo.size) {
+        const seed=todo.values().next().value;
+        todo.delete(seed);
+        const connected=[seed],todoVisit=[seed];
+        while(todoVisit.length) {
+          const pos=todoVisit.pop();
+          for(const n of getNeighbors(pos,cols,rows)) {
+            if(todo.has(n)&&canGroupTiles(tiles[map[pos]],tiles[map[n]],gear)) {
+              todo.delete(n);connected.push(n);todoVisit.push(n);
+            }
+          }
+        }
+        components.push(connected);
+      }
+      result.push({key,positions,components,physical:key.startsWith('physical:')});
+    }
+    return result;
   }
   function groupedStart(map, tiles, gear, goal, cols, rows, blocked, rnd) {
     const size=cols*rows;
@@ -283,47 +334,32 @@
         }
       });
     }
-    // Small compactness preference reduces fragmented same-family islands.
-    Object.entries(groups).forEach(([id,positions]) => {
-      if (positions.length < 2 || gear.families[id].adjacency === 'none') return;
-      positions = positions.filter(pos => !tiles[map[pos]].noAdjacency && !(id==='underwater' && tiles[map[pos]].role!=='upgrade'));
-      if(positions.length<2)return;
-      const meanX = positions.reduce((s,p)=>s+(p%cols),0)/positions.length;
-      const meanY = positions.reduce((s,p)=>s+Math.floor(p/cols),0)/positions.length;
-      let spread = 0;
-      positions.forEach(p => { spread += Math.abs(p%cols-meanX)+Math.abs(Math.floor(p/cols)-meanY); });
+    // Two independent facts are tracked:
+    //  1. Actual known adjacency links above are the ONLY source of a bonus.
+    //  2. Spatial clustering below includes construction-only groups with NO
+    //     verified adjacency (habs, reactors, tractor beams). This can NEVER
+    //     increase the reported link count or manufacture a stat bonus.
+    let physicalSplitGroups=0;
+    for(const group of groupShape(map,tiles,gear,cols,rows)) {
+      const positions=group.positions;
+      const id=tiles[map[positions[0]]].family;
       const weight=Math.max(0,Number(goal.weights[id] ?? 1));
-      // Always compact technology families: the old weight-only penalty was
-      // exactly zero for the secondary systems Long Range and Combat omit.
-      compactnessPenalty += spread * (.20 + .09 * weight);
-      // Reward one cohesive group instead of two disconnected mini-clusters.
-      // Only count tiles for which at least one same-family adjacency is
-      // modeled, so standalone and special-case technology is not penalized.
-      const eligible=positions.filter(pos=>positions.some(other=>other!==pos &&
-        areAdjacent(tiles[map[pos]],tiles[map[other]],gear)));
-      if(eligible.length<2)return;
-      const left=new Set(eligible);
-      let components=0;
-      while(left.size){
-        components++;
-        const first=left.values().next().value;
-        left.delete(first);
-        const queue=[first];
-        while(queue.length){
-          const here=queue.pop();
-          for(const neighbor of getNeighbors(here,cols,rows)){
-            if(left.has(neighbor)&&areAdjacent(tiles[map[here]],tiles[map[neighbor]],gear)){
-              left.delete(neighbor);queue.push(neighbor);
-            }
-          }
-        }
+      const meanX=positions.reduce((sum,pos)=>sum+pos%cols,0)/positions.length;
+      const meanY=positions.reduce((sum,pos)=>sum+Math.floor(pos/cols),0)/positions.length;
+      const spread=positions.reduce((sum,pos)=>sum+Math.abs(pos%cols-meanX)+Math.abs(Math.floor(pos/cols)-meanY),0);
+      compactnessPenalty+=spread*(group.physical ? 0.9 : .20+.09*weight);
+      if(group.components.length>1) {
+        const extra=group.components.length-1;
+        fragmentedGroups+=extra;
+        if(group.physical)physicalSplitGroups+=extra;
+        // Strong family cohesion outranks incidental extra adjacency links,
+        // but it cannot evict the precommitted goal-specific SC modules.
+        compactnessPenalty+=extra*(210+5*weight);
       }
-      if(components>1){fragmentedGroups+=components-1;
-        compactnessPenalty+=(components-1)*(62 + 4*weight);}
-    });
+    }
     score = scScore + adjacencyScore - compactnessPenalty;
     return {score,connections,usedSC,effectiveSC,scScore,adjacencyScore,
-      compactnessPenalty,fragmentedGroups,scPlacements};
+      compactnessPenalty,fragmentedGroups,physicalSplitGroups,scPlacements};
   }
   function solve({gear,profile}) {
     const {cols,rows} = profile;
@@ -379,12 +415,23 @@
         const trial=scoreMap(map,tiles,gear,goal,cols,rows,sc);
         const progress=i/loops;
         const temperature=7.5*Math.pow(.008,progress);
-        if(trial.score>now.score || rnd()<Math.exp((trial.score-now.score)/temperature)) {
+        // The annealer used to scatter joined construction groups because
+        // it saw no true adjacency bonus for their positions. Never accept a
+        // move that *increases* the number of spatial family islands. The
+        // initial packing already respects all movable secondary families.
+        if(trial.fragmentedGroups<=now.fragmentedGroups &&
+           (trial.score>now.score || rnd()<Math.exp((trial.score-now.score)/temperature))) {
           now=trial;
-          if(now.score>top.score){top=now;topMap=map.slice();}
+          if(!top || now.fragmentedGroups<top.fragmentedGroups ||
+             (now.fragmentedGroups===top.fragmentedGroups&&now.score>top.score)){
+            top=now;topMap=map.slice();
+          }
         } else [map[a],map[b]]=[map[b],map[a]];
       }
-      if(!bestStats || top.score>bestStats.score){bestStats=top;bestMap=topMap;}
+      if(!bestStats || top.fragmentedGroups<bestStats.fragmentedGroups ||
+         (top.fragmentedGroups===bestStats.fragmentedGroups&&top.score>bestStats.score)){
+        bestStats=top;bestMap=topMap;
+      }
     }
     // Final cohesion pass: stochastic search can leave a secondary group split
     // despite an obvious nearby legal move. Try swaps that bring compatible
@@ -405,14 +452,14 @@
           const tile=tiles[bestMap[a]];
           if(!tile || tile.noAdjacency)continue;
           for(const anchor of available){
-            if(a===anchor || !areAdjacent(tile,tiles[bestMap[anchor]],gear))continue;
+            if(a===anchor || !canGroupTiles(tile,tiles[bestMap[anchor]],gear))continue;
             for(const b of getNeighbors(anchor,cols,rows)){
               if(!legalSwap(a,b,bestMap) || blocked.has(b))continue;
               [bestMap[a],bestMap[b]]=[bestMap[b],bestMap[a]];
               const trial=scoreMap(bestMap,tiles,gear,goal,cols,rows,sc);
               [bestMap[a],bestMap[b]]=[bestMap[b],bestMap[a]];
               const delta=trial.score-bestStats.score;
-              if(delta>gain+1e-7){gain=delta;swapA=a;swapB=b;nextStats=trial;}
+              if(trial.fragmentedGroups<=bestStats.fragmentedGroups && delta>gain+1e-7){gain=delta;swapA=a;swapB=b;nextStats=trial;}
             }
           }
         }

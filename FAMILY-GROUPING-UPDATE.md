@@ -26,3 +26,9 @@ Some SC configurations force disconnected groups: e.g. four Hyperdrive modules i
 - Repeated identical inputs produce deterministic layouts.
 
 Run `node --test tests/*.test.cjs` from the extracted website root to repeat these checks.
+
+## Follow-up correction: construction-only spatial clustering
+
+A real exported Corvette PDF revealed that `noAdjacency` modules had been omitted from family grouping entirely. This was incorrect for planning: it separated multiple Legion-Class Habs and multiple Chelone-Class Generators despite available adjacent slots.
+
+The optimizer now groups matching construction tiles geographically even when they have no verified in-game adjacency relationship. Their physical proximity does not increment actual adjacency links or modeled stat bonuses. A separation penalty and annealing guard prevent them from being scattered during later optimization. The exact 10×6, 50-tile Corvette manifest from the report is covered by a dedicated regression test.

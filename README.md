@@ -11,6 +11,12 @@ The **Salvage specialist** starter plan includes one Tractor Beam. If the model 
 
 Sources: [Official Cosmos update](https://www.nomanssky.com/cosmos-update/), [community report on missing technology tile](https://www.reddit.com/r/oldmansky/comments/1wgdg22/tractor_beam_not_being_recognised_check_your/).
 
+## Corvette hab/reactor grouping correction (October 31, 2026)
+
+The optimizer now places matching construction-only technology tiles together even when their in-game adjacency bonus has **not** been verified. Previously, `noAdjacency:true` caused multiple Legion-Class Habs, Chelone-Class Generators, and other built modules to be treated as unrelated loose tiles, leading to scattered inventory placements. The fix separates **spatial organization** from **verified adjacency**: built modules with the same physical family now form contiguous grid clusters when possible, but their proximity never increases the modeled link count or stat bonus. Existing supercharged assignments remain protected. A cohesion guard prevents stochastic refinement from undoing connected families.
+
+The uploaded October 31 Corvette PDF is now a dedicated regression fixture: the same 10×6 layout with 50 modules and four scattered Long Range SC positions creates three adjacent Habs, two adjacent Chelone Generators, and keeps all four Hyperdrive priority modules on SC. See `tests/pdf-corvette-regression.test.cjs` and `CORVETTE-COHESION-FIX.md`. Re-run **Optimize Corvette tech** after deploying; previous PDF reports and saved arrangements are not rewritten automatically.
+
 ## Family-first adjacency placement (October 31, 2026)
 
 The optimizer now **builds connected family clusters as its starting layout**, instead of randomly scattering all modules and trying to reunite them with single swaps. When multiple priority-family modules are fixed on supercharged positions, it first attempts to bridge compatible groups through available spaces. It then refines the result using stronger penalties for split groups and the existing goal-weighted adjacency bonuses.
